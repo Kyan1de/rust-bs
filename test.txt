@@ -1,0 +1,16 @@
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'
+powershell echo "this is a test"
+powershell echo 'here it is doing multiple lines'

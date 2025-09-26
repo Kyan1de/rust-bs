@@ -72,3 +72,37 @@ impl BuildSys {
 
 }
 
+
+/// saves and loads BuildSys structs
+pub struct BuildConfig;
+
+impl BuildConfig {
+
+    pub fn load(file_name: &str) -> Option<BuildSys> {
+        
+        use std::fs;
+        use regex::Regex;
+
+        if fs::exists(file_name).unwrap() {
+            let contents = fs::read_to_string(file_name).unwrap();
+            let contents: Vec<&str> = contents.split("\n").collect();
+
+            let mut build = BuildSys::new();
+
+            contents.iter().for_each(|l|{
+                let l: Vec<&str> = Regex::new("((\\\"|\\\').*?(\\\"|\\\'))|(\\b\\w+\\b)").unwrap()
+                                    .find_iter(&l).map(|mat|{mat.as_str()})
+                                    .collect();
+                if l.len() == 0 {return;}
+                else if l.len() == 1 {build.add_command(l[0], &[]);}
+                else {build.add_command(l[0], &l[1..]);}
+            });
+
+            Some(build)
+        } else {
+            None
+        }
+
+    }
+
+}
