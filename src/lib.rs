@@ -1,4 +1,6 @@
-use std::process::{Command, Output, Stdio};
+use std::{collections::HashMap, io::Write, process::{Command, Output, Stdio}};
+use std::fs;
+use regex::Regex;
 
 pub type CommandID = usize;
 
@@ -20,6 +22,7 @@ pub type CommandID = usize;
 ///     assert_eq!(s, "".to_string());
 /// });
 /// ```
+#[derive(Debug)]
 pub struct BuildSys {
     pub tasks: Vec<Command>, // ordered list of commands to run
     pub outputs: Vec<Output>, // matches order of commands
@@ -74,15 +77,14 @@ impl BuildSys {
 
 
 /// saves and loads BuildSys structs
-pub struct BuildConfig;
+#[derive(Debug)]
+pub struct BuildSerializer;
 
-impl BuildConfig {
+impl BuildSerializer {
+    
 
     pub fn load(file_name: &str) -> Option<BuildSys> {
         
-        use std::fs;
-        use regex::Regex;
-
         if fs::exists(file_name).unwrap() {
             let contents = fs::read_to_string(file_name).unwrap();
             let contents: Vec<&str> = contents.split("\n").collect();
@@ -103,6 +105,134 @@ impl BuildConfig {
             None
         }
 
+    }
+
+    pub fn write(file_path: &str, build: BuildSys) -> fs::File {
+
+        let mut file = fs::File::create(file_path).unwrap();
+        for cmd in build.tasks {
+            let command: String = cmd.get_program().to_str().unwrap().to_string();
+            let args: String = cmd.get_args().collect::<Vec<_>>().iter()
+                                .map(|s|{String::from(s.to_str().unwrap())})
+                                .collect::<Vec<_>>().join(" ");
+            file.write((command + &String::from(" ") + &args + &String::from("\n")).as_bytes()).unwrap();
+        }
+        file
+
+    }
+
+}
+
+
+pub enum VarVal {
+    String(String),
+    Number(f64),
+}
+pub type VarTable = HashMap<String, VarVal>;
+/// generates BuildSys structs from .rbs files 
+#[derive(Debug)]
+pub struct BuildParser;
+
+// used to construct the AST for the parser
+#[derive(Debug)]
+pub enum BSAst {
+    Prog(Vec<BSAst>), // root node, program
+    Ident(String), // identifier
+    Batch(Vec<BSAst>), // batch of commands to run at once, once generated
+    Stmt(Vec<BSAst>), // statement line, may generate a command or do some logic shit idk
+    
+    // literals
+    Num(String), // number literal
+    Str(String), // string literal
+    
+    // operations
+    SetVar(Box<BSAst>, Box<BSAst>), // set <Iden> = <Ident||Num||Str||Expr||Generate>
+    Expr(Vec<BSAst>), // <term> <+||-||*||/> <term> || <term>
+    Term(Vec<BSAst>), // (<expr>) || <Num||Ident||Str>
+    Generate(Vec<BSAst>), // gen <((Iden )||(*Iden ))*>
+    Unpack(Box<BSAst>), // *iden from the above, unpacks an array
+}
+
+
+impl BuildParser {
+
+    pub fn lex(input: &str) -> Vec<&str> {
+        let mut out = vec![];
+
+        input.split("\n").for_each(|l|{
+            let mut split: Vec<&str> = Regex::new("(\\\".*?\\\")|(#.*)|[\\+\\-\\*\\/\\=\\(\\)\\[\\]\\,]|(\\b\\S+?\\b)").unwrap()
+                                    .find_iter(&l).map(|mat|{
+                                        if mat.as_str().ends_with("\r") {&mat.as_str()[..(mat.len()-1)]} else {mat.as_str()}
+                                    })
+                                    .collect();
+            out.append(&mut split);
+            out.push("\n");
+        });
+        
+        out
+    }
+
+    pub fn parse(input: Vec<&str>) -> BSAst {
+        
+        let mut clean: Vec<&str> = vec![];
+
+        for token in input {
+            if !token.starts_with("#") {
+                clean.push(token);
+            }
+        }
+
+        BSAst::Prog(Self::parse_lines(&mut clean))
+    }
+
+    fn parse_lines(global_toks: &mut Vec<&str>) -> Vec<BSAst>{
+        let mut statement: Vec<&str>;
+        let mut parsed = vec![];
+        loop {
+            let idx = global_toks.iter().position(|a| (*a).eq("\n")).unwrap_or(0);
+            if idx == global_toks.len() {break;}
+            (statement, *global_toks) = {
+                let (a, b) = global_toks.split_at(idx);
+                let (_, b) = b.split_first().unwrap();
+                (Vec::from(a), Vec::from(b))
+            };
+            println!("{:?}", statement);
+            parsed.push(Self::parse_part(statement.as_slice(), global_toks));
+        }
+        parsed
+    }
+
+    fn parse_part(statement: &[&str], global_toks: &mut Vec<&str>) -> BSAst {
+        match statement {
+            ["batch"] => {
+                let mut inner: Vec<&str>;
+                let idx = global_toks.iter().position(|a| (*a).eq("end")).unwrap_or(0);
+                (inner, *global_toks) = {
+                    let (a, b) = global_toks.split_at(idx);
+                    let (_, b) = b.split_first().unwrap();
+                    (Vec::from(a), Vec::from(b))
+                };
+                BSAst::Batch(Self::parse_lines(&mut inner))
+            },
+            ["set", iden, "=", tail @ ..] => {
+                BSAst::SetVar(Box::new(BSAst::Ident(iden.to_string())), Box::new(Self::parse_part(tail, &mut vec![])))
+            },
+            ["gen", tail @ ..] => {
+                let mut args = vec![];
+                let mut unpack_next: bool = false;
+                for token in tail {
+                    if (*token).eq("*") {unpack_next = true;}
+                    else if unpack_next {
+                        args.push(BSAst::Unpack(Box::new(BSAst::Ident(token.to_string()))));
+                        unpack_next = false;
+                    } else {
+                        args.push(BSAst::Ident(token.to_string()));
+                    }
+                }
+                BSAst::Generate(args)
+            },
+            _ => {todo!();},
+        }
     }
 
 }

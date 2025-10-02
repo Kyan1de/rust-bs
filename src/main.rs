@@ -1,12 +1,12 @@
 use rust_bs::*;
 
 fn main() {
-
-    let mut bs = BuildConfig::load("./test.txt").unwrap();
+    use std::fs;
+    let contents = fs::read_to_string("./buildsys/test.rbs").unwrap();
     
-    bs.run();
+    println!("{:#?}", BuildParser::parse(BuildParser::lex(&contents)));
 
-    println!("{:?}", bs.outputs);
-    bs.outputs.iter_mut().for_each(|a|{println!("{}", String::from_utf8(a.stdout.clone()).unwrap())});
+    //let mut bs = BuildSerializer::load("./buildsys/buildSerial/test.txt").unwrap();
+    
 
 }
