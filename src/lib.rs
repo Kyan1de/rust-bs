@@ -212,7 +212,6 @@ impl BuildParser {
                 let (_, b) = b.split_first().unwrap();
                 (Vec::from(a), Vec::from(b))
             };
-            println!("{:?}", statement);
             parsed.push(Self::parse_part(statement.as_slice(), global_toks));
         }
         parsed
