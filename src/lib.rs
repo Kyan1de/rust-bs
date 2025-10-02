@@ -144,6 +144,7 @@ pub enum BSAst {
     // literals
     Num(String), // number literal
     Str(String), // string literal
+    Arr(Vec<BSAst>), // array literal
     
     // operations
     SetVar(Box<BSAst>, Box<BSAst>), // set <Iden> = <Ident||Num||Str||Expr||Generate>
@@ -151,6 +152,7 @@ pub enum BSAst {
     Term(Vec<BSAst>), // (<expr>) || <Num||Ident||Str>
     Generate(Vec<BSAst>), // gen <((Iden )||(*Iden ))*>
     Unpack(Box<BSAst>), // *iden from the above, unpacks an array
+    None
 }
 
 
@@ -231,7 +233,21 @@ impl BuildParser {
                 }
                 BSAst::Generate(args)
             },
-            _ => {todo!();},
+            ["[", content @ .., "]"] => {
+                let mut internal = vec![]; 
+                for element in content.split(|s| (*s).eq(",")) {
+                    internal.push(Self::parse_part(element, &mut vec![]));
+                }
+                BSAst::Arr(internal)
+            },
+            [single] => {
+                match single.chars().nth(0).unwrap() {
+                    '\"' => BSAst::Str(single.to_string()),
+                    '0'..='9' => BSAst::Num(single.to_string()),
+                    _ => BSAst::Ident(single.to_string())
+                }
+            }
+            _ => {BSAst::None},
         }
     }
 
