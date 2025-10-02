@@ -178,9 +178,23 @@ impl BuildParser {
         
         let mut clean: Vec<&str> = vec![];
 
-        for token in input {
-            if !token.starts_with("#") {
-                clean.push(token);
+        for token in input.windows(2) {
+            match token {
+                [A, B] => {
+                    if (*A).eq("\n") && (*B).eq("\n") {
+                        () // dont push the token if followed immediately by another \n
+                    } else if !A.starts_with("#") {
+                        clean.push(A);
+                    }
+                },
+                [A] => {
+                    if (*A).eq("\n") {
+                        () // dont push the token if no tokens follow
+                    } else if !A.starts_with("#") {
+                        clean.push(A);
+                    }        
+                },
+                _ => {()}
             }
         }
 
