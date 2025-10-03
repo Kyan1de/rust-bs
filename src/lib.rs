@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Write, process::{Command, Output, Stdio}};
+use std::{collections::HashMap, io::Write, iter::Peekable, process::{Command, Output, Stdio}};
 use std::fs;
 use regex::Regex;
 
@@ -148,11 +148,13 @@ pub enum BSAst {
     
     // operations
     SetVar(Box<BSAst>, Box<BSAst>), // set <Iden> = <Ident||Num||Str||Expr||Generate>
-    Expr(Vec<BSAst>), // <term> <+||-||*||/> <term> || <term>
-    Term(Vec<BSAst>), // (<expr>) || <Num||Ident||Str>
     Generate(Vec<BSAst>), // gen <((Iden )||(*Iden ))*>
     Unpack(Box<BSAst>), // *iden from the above, unpacks an array
-    None
+    None,
+
+    ExprAdd(Vec<BSAst>, bool), // <ExprAdd> <+||-> <ExprMul> || <ExprMul> (bool is to do the inverse op)
+    ExprMul(Vec<BSAst>, bool), // <ExprMul> <*||/> <ExprTerm> || <ExprTerm> (bool is to do the inverse op)
+    ExprTerm(Vec<BSAst>) // (<expr>) || <Num||Ident||Str>
 }
 
 
@@ -253,15 +255,69 @@ impl BuildParser {
                 }
                 BSAst::Arr(internal)
             },
-            [single] => {
-                match single.chars().nth(0).unwrap() {
-                    '\"' => BSAst::Str(single.to_string()),
-                    '0'..='9' => BSAst::Num(single.to_string()),
-                    _ => BSAst::Ident(single.to_string())
-                }
-            }
-            _ => {BSAst::None},
+            [expr @ ..] 
+            if (expr.contains(&"+") || expr.contains(&"-") || expr.contains(&"*") || expr.contains(&"/") || expr.contains(&"(")) => {
+                Self::parse_expr(expr)
+            },
+            [ex @ ..] => {Self::parse_expr(ex)},
         }
+    }
+
+    fn parse_expr(expr: &[&str]) -> BSAst {
+        let mut expr = expr.iter().peekable();
+        Self::parse_add_expr(&mut expr)
+    }
+
+    fn parse_add_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
+        let mut res = Self::parse_mul_expr(expr);
+        loop {
+            match expr.peek() {
+                Some(&&"+") => {
+                    expr.next();
+                    res = BSAst::ExprAdd(vec![res, Self::parse_mul_expr(expr)], false);
+                },
+                Some(&&"-") => {
+                    expr.next();
+                    res = BSAst::ExprAdd(vec![res, Self::parse_mul_expr(expr)], true);
+                },
+                _ => break res,
+            }
+        }
+    }
+
+    fn parse_mul_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
+        let mut res = Self::parse_term_expr(expr);
+        loop {
+            match expr.peek() {
+                Some(&&"*") => {
+                    expr.next();
+                    res = BSAst::ExprMul(vec![res, Self::parse_term_expr(expr)], false);
+                },
+                Some(&&"/") => {
+                    expr.next();
+                    res = BSAst::ExprMul(vec![res, Self::parse_term_expr(expr)], true);
+                },
+                _ => break res,
+            }
+        }
+    }
+
+    fn parse_term_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
+        match expr.peek() {
+            Some(&&"(") => {
+                expr.next();
+                let res = Self::parse_add_expr(expr);
+                if expr.next().ne(&Some(&")")) {panic!("Syntax error!")}
+                res
+            },
+            Some(s) => {
+                if ("0123456789".contains((**s).chars().nth(0).unwrap())) {BSAst::Num(s.to_string())}
+                else if (**s).chars().nth(0).unwrap().eq(&'"') {BSAst::Str(s.to_string())}
+                else {BSAst::Ident(s.to_string())}
+            },
+            None => panic!("Syntax error!")
+        }
+        
     }
 
 }
