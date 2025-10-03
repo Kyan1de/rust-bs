@@ -259,7 +259,9 @@ impl BuildParser {
             if (expr.contains(&"+") || expr.contains(&"-") || expr.contains(&"*") || expr.contains(&"/") || expr.contains(&"(")) => {
                 Self::parse_expr(expr)
             },
-            [ex @ ..] => {Self::parse_expr(ex)},
+            [val] => {Self::parse_expr(&[val])},
+            [] => BSAst::None,
+            _ => panic!("???")
         }
     }
 
@@ -311,11 +313,11 @@ impl BuildParser {
                 res
             },
             Some(s) => {
-                if ("0123456789".contains((**s).chars().nth(0).unwrap())) {BSAst::Num(s.to_string())}
-                else if (**s).chars().nth(0).unwrap().eq(&'"') {BSAst::Str(s.to_string())}
-                else {BSAst::Ident(s.to_string())}
+                if ("0123456789".contains((**s).chars().nth(0).unwrap())) {let r = BSAst::Num(s.to_string());expr.next();r}
+                else if (**s).chars().nth(0).unwrap().eq(&'"') {let r = BSAst::Str(s.to_string());expr.next();r}
+                else {let r = BSAst::Ident(s.to_string());expr.next();r}
             },
-            None => panic!("Syntax error!")
+            None => BSAst::None
         }
         
     }
