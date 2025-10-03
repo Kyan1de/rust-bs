@@ -182,18 +182,18 @@ impl BuildParser {
 
         for token in input.windows(2) {
             match token {
-                [A, B] => {
-                    if (*A).eq("\n") && (*B).eq("\n") {
+                [a, b] => {
+                    if (*a).eq("\n") && (*b).eq("\n") {
                         () // dont push the token if followed immediately by another \n
-                    } else if !A.starts_with("#") {
-                        clean.push(A);
+                    } else if !a.starts_with("#") {
+                        clean.push(a);
                     }
                 },
-                [A] => {
-                    if (*A).eq("\n") {
+                [a] => {
+                    if (*a).eq("\n") {
                         () // dont push the token if no tokens follow
-                    } else if !A.starts_with("#") {
-                        clean.push(A);
+                    } else if !a.starts_with("#") {
+                        clean.push(a);
                     }        
                 },
                 _ => {()}
@@ -313,7 +313,7 @@ impl BuildParser {
                 res
             },
             Some(s) => {
-                if ("0123456789".contains((**s).chars().nth(0).unwrap())) {let r = BSAst::Num(s.to_string());expr.next();r}
+                if "0123456789".contains((**s).chars().nth(0).unwrap()) {let r = BSAst::Num(s.to_string());expr.next();r}
                 else if (**s).chars().nth(0).unwrap().eq(&'"') {let r = BSAst::Str(s.to_string());expr.next();r}
                 else {let r = BSAst::Ident(s.to_string());expr.next();r}
             },
