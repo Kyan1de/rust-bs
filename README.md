@@ -6,7 +6,8 @@ A general-use build system written in rust
 ```
 # sets up args, to happen in sequence
 set prog = "powershell"
-set args = ["echo", "echo", "test"]
+set number = (0.14 + 3) * 4
+set args = ["echo", "echo", number]
 
 batch # sets up batch of commands to run together. 
     # you may not mutate a variable within a batch of commands, due to issues with race conditions.
