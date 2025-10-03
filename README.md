@@ -28,5 +28,5 @@ end
 as you can probably tell, this is very early into development. 
 
 todo:
- - math & expressions
  - evaluating a build once it is actually generated
+ - providing examples
