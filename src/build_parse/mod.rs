@@ -2,12 +2,19 @@ use std::collections::HashMap;
 use std::iter::Peekable;
 use regex::Regex;
 
+/// represents the value that a variable holds
 pub enum VarVal {
     String(String),
-    Number(f64),
+    NumberF(f64),
+    NumberI(i64),
+    Arr(Vec<VarVal>)
 }
+
+/// lookup table for variables
 pub type VarTable = HashMap<String, VarVal>;
+
 /// generates BuildSys structs from .rbs files 
+/// TODO: rewrite the whole parser to process actual tokens (should make it cleaner?)
 #[derive(Debug)]
 pub struct BuildParser;
 
@@ -38,6 +45,7 @@ pub enum BSAst {
 
 impl BuildParser {
 
+    /// takes a string input and splits it into token strings
     pub fn lex(input: &str) -> Vec<&str> {
         let mut out = vec![];
 
@@ -54,6 +62,7 @@ impl BuildParser {
         out
     }
 
+    /// takes a vector of token strings and constructs an AST
     pub fn parse(input: Vec<&str>) -> BSAst {
         
         let mut clean: Vec<&str> = vec![];
@@ -81,6 +90,7 @@ impl BuildParser {
         BSAst::Prog(Self::parse_lines(&mut clean))
     }
 
+    /// parses lines of tokens
     fn parse_lines(global_toks: &mut Vec<&str>) -> Vec<BSAst>{
         let mut statement: Vec<&str>;
         let mut parsed = vec![];
@@ -97,6 +107,7 @@ impl BuildParser {
         parsed
     }
 
+    /// parses a part of the tokens
     fn parse_part(statement: &[&str], global_toks: &mut Vec<&str>) -> BSAst {
         match statement {
             ["batch"] => {
@@ -143,11 +154,12 @@ impl BuildParser {
         }
     }
 
+    /// parses a math expression
     fn parse_expr(expr: &[&str]) -> BSAst {
         let mut expr = expr.iter().peekable();
         Self::parse_add_expr(&mut expr)
     }
-
+    
     fn parse_add_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
         let mut res = Self::parse_mul_expr(expr);
         loop {

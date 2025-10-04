@@ -9,7 +9,7 @@ pub struct BuildSerializer;
 
 impl BuildSerializer {
     
-
+    /// loads a BuildSys from a file
     pub fn load(file_name: &str) -> Option<BuildSys> {
         
         if fs::exists(file_name).unwrap() {
@@ -34,6 +34,7 @@ impl BuildSerializer {
 
     }
 
+    /// writes a BuildSys to a file, returning the file handle
     pub fn write(file_path: &str, build: BuildSys) -> fs::File {
 
         let mut file = fs::File::create(file_path).unwrap();

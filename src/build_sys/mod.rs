@@ -28,10 +28,13 @@ pub struct BuildSys {
 
 impl BuildSys {
 
+    /// Creates a new BuildSys object
+    #[must_use]
     pub fn new() -> Self {
         Self{tasks:vec![], outputs:vec![]}
     }
 
+    /// adds a command to the build system's queue
     pub fn add_command(&mut self, command_name: &str, args: &[&str]) -> CommandID {
         let mut c = Command::new(command_name);
         c.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -39,6 +42,7 @@ impl BuildSys {
         self.tasks.len() - 1
     }
 
+    /// adds arguments to a command using its command id
     pub fn add_arguments(&mut self, command_id: CommandID, args: &[&str]) {
         match self.tasks.get_mut(command_id) {
             Some(c) => {c.args(args);},
@@ -46,10 +50,12 @@ impl BuildSys {
         }
     }
 
-    pub fn remove_command(&mut self, _command_id: CommandID) {
-        todo!();
+    // removes a command by command id
+    pub fn remove_command(&mut self, command_id: CommandID) {
+        self.tasks.remove(command_id);
     }
 
+    /// runs all commands in sequence
     pub fn run(&mut self) {
         self.tasks.iter_mut().for_each(|task|{
             self.outputs = vec![];
@@ -69,6 +75,11 @@ impl BuildSys {
             }
             
         });
+    }
+
+    /// runs all commands in parralel
+    pub fn run_parralel(&mut self) {
+        todo!()
     }
 
 }
