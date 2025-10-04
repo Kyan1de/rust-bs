@@ -1,0 +1,203 @@
+use std::collections::HashMap;
+use std::iter::Peekable;
+use regex::Regex;
+
+pub enum VarVal {
+    String(String),
+    Number(f64),
+}
+pub type VarTable = HashMap<String, VarVal>;
+/// generates BuildSys structs from .rbs files 
+#[derive(Debug)]
+pub struct BuildParser;
+
+// used to construct the AST for the parser
+#[derive(Debug)]
+pub enum BSAst {
+    Prog(Vec<BSAst>), // root node, program
+    Ident(String), // identifier
+    Batch(Vec<BSAst>), // batch of commands to run at once, once generated
+    Stmt(Vec<BSAst>), // statement line, may generate a command or do some logic shit idk
+    
+    // literals
+    Num(String), // number literal
+    Str(String), // string literal
+    Arr(Vec<BSAst>), // array literal
+    
+    // operations
+    SetVar(Box<BSAst>, Box<BSAst>), // set <Iden> = <Ident||Num||Str||Expr||Generate>
+    Generate(Vec<BSAst>), // gen <((Iden )||(*Iden ))*>
+    Unpack(Box<BSAst>), // *iden from the above, unpacks an array
+    None,
+
+    ExprAdd(Vec<BSAst>, bool), // <ExprAdd> <+||-> <ExprMul> || <ExprMul> (bool is to do the inverse op)
+    ExprMul(Vec<BSAst>, bool), // <ExprMul> <*||/> <ExprTerm> || <ExprTerm> (bool is to do the inverse op)
+    ExprTerm(Vec<BSAst>) // (<expr>) || <Num||Ident||Str>
+}
+
+
+impl BuildParser {
+
+    pub fn lex(input: &str) -> Vec<&str> {
+        let mut out = vec![];
+
+        input.split("\n").for_each(|l|{
+            let mut split: Vec<&str> = Regex::new("(\\d+\\.\\d+)|(\\\".*?\\\")|(#.*)|[\\+\\-\\*\\/\\=\\(\\)\\[\\]\\,]|(\\b\\S+?\\b)").unwrap()
+                                    .find_iter(&l).map(|mat|{
+                                        if mat.as_str().ends_with("\r") {&mat.as_str()[..(mat.len()-1)]} else {mat.as_str()}
+                                    })
+                                    .collect();
+            out.append(&mut split);
+            out.push("\n");
+        });
+        
+        out
+    }
+
+    pub fn parse(input: Vec<&str>) -> BSAst {
+        
+        let mut clean: Vec<&str> = vec![];
+
+        for token in input.windows(2) {
+            match token {
+                [a, b] => {
+                    if (*a).eq("\n") && (*b).eq("\n") {
+                        () // dont push the token if followed immediately by another \n
+                    } else if !a.starts_with("#") {
+                        clean.push(a);
+                    }
+                },
+                [a] => {
+                    if (*a).eq("\n") {
+                        () // dont push the token if no tokens follow
+                    } else if !a.starts_with("#") {
+                        clean.push(a);
+                    }        
+                },
+                _ => {()}
+            }
+        }
+
+        BSAst::Prog(Self::parse_lines(&mut clean))
+    }
+
+    fn parse_lines(global_toks: &mut Vec<&str>) -> Vec<BSAst>{
+        let mut statement: Vec<&str>;
+        let mut parsed = vec![];
+        loop {
+            let idx = global_toks.iter().position(|a| (*a).eq("\n")).unwrap_or(0);
+            if idx == global_toks.len() {break;}
+            (statement, *global_toks) = {
+                let (a, b) = global_toks.split_at(idx);
+                let (_, b) = b.split_first().unwrap();
+                (Vec::from(a), Vec::from(b))
+            };
+            parsed.push(Self::parse_part(statement.as_slice(), global_toks));
+        }
+        parsed
+    }
+
+    fn parse_part(statement: &[&str], global_toks: &mut Vec<&str>) -> BSAst {
+        match statement {
+            ["batch"] => {
+                let mut inner: Vec<&str>;
+                let idx = global_toks.iter().position(|a| (*a).eq("end")).unwrap_or(0);
+                (inner, *global_toks) = {
+                    let (a, b) = global_toks.split_at(idx);
+                    let (_, b) = b.split_first().unwrap();
+                    (Vec::from(a), Vec::from(b))
+                };
+                BSAst::Batch(Self::parse_lines(&mut inner))
+            },
+            ["set", iden, "=", tail @ ..] => {
+                BSAst::SetVar(Box::new(BSAst::Ident(iden.to_string())), Box::new(Self::parse_part(tail, &mut vec![])))
+            },
+            ["gen", tail @ ..] => {
+                let mut args = vec![];
+                let mut unpack_next: bool = false;
+                for token in tail {
+                    if (*token).eq("*") {unpack_next = true;}
+                    else if unpack_next {
+                        args.push(BSAst::Unpack(Box::new(BSAst::Ident(token.to_string()))));
+                        unpack_next = false;
+                    } else {
+                        args.push(BSAst::Ident(token.to_string()));
+                    }
+                }
+                BSAst::Generate(args)
+            },
+            ["[", content @ .., "]"] => {
+                let mut internal = vec![]; 
+                for element in content.split(|s| (*s).eq(",")) {
+                    internal.push(Self::parse_part(element, &mut vec![]));
+                }
+                BSAst::Arr(internal)
+            },
+            [expr @ ..] 
+            if (expr.contains(&"+") || expr.contains(&"-") || expr.contains(&"*") || expr.contains(&"/") || expr.contains(&"(")) => {
+                Self::parse_expr(expr)
+            },
+            [val] => {Self::parse_expr(&[val])},
+            [] => BSAst::None,
+            _ => panic!("???")
+        }
+    }
+
+    fn parse_expr(expr: &[&str]) -> BSAst {
+        let mut expr = expr.iter().peekable();
+        Self::parse_add_expr(&mut expr)
+    }
+
+    fn parse_add_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
+        let mut res = Self::parse_mul_expr(expr);
+        loop {
+            match expr.peek() {
+                Some(&&"+") => {
+                    expr.next();
+                    res = BSAst::ExprAdd(vec![res, Self::parse_mul_expr(expr)], false);
+                },
+                Some(&&"-") => {
+                    expr.next();
+                    res = BSAst::ExprAdd(vec![res, Self::parse_mul_expr(expr)], true);
+                },
+                _ => break res,
+            }
+        }
+    }
+
+    fn parse_mul_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
+        let mut res = Self::parse_term_expr(expr);
+        loop {
+            match expr.peek() {
+                Some(&&"*") => {
+                    expr.next();
+                    res = BSAst::ExprMul(vec![res, Self::parse_term_expr(expr)], false);
+                },
+                Some(&&"/") => {
+                    expr.next();
+                    res = BSAst::ExprMul(vec![res, Self::parse_term_expr(expr)], true);
+                },
+                _ => break res,
+            }
+        }
+    }
+
+    fn parse_term_expr<'a, 'b>(expr: &'a mut Peekable<std::slice::Iter<'b, &str>>) -> BSAst {
+        match expr.peek() {
+            Some(&&"(") => {
+                expr.next();
+                let res = Self::parse_add_expr(expr);
+                if expr.next().ne(&Some(&")")) {panic!("Syntax error!")}
+                res
+            },
+            Some(s) => {
+                if "0123456789".contains((**s).chars().nth(0).unwrap()) {let r = BSAst::Num(s.to_string());expr.next();r}
+                else if (**s).chars().nth(0).unwrap().eq(&'"') {let r = BSAst::Str(s.to_string());expr.next();r}
+                else {let r = BSAst::Ident(s.to_string());expr.next();r}
+            },
+            None => BSAst::None
+        }
+        
+    }
+
+}

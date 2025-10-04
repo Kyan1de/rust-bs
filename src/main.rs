@@ -1,4 +1,4 @@
-use rust_bs::*;
+use rust_bs::prelude::*;
 
 fn main() {
     use std::fs;
