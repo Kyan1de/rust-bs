@@ -16,7 +16,7 @@ pub type VarTable = HashMap<String, VarVal>;
 pub struct BuildParser;
 
 // used to construct the AST for the parser
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BSAst {
     Prog(Vec<BSAst>), // root node, program
     Ident(String), // identifier

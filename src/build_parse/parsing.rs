@@ -28,6 +28,7 @@ impl BuildParser {
                 loop {
                     match global_toks.next() {
                         Some([BSToken::Word(s)]) if s.eq("end") => {break},
+                        Some([BSToken::Word(s)]) if s.eq("batch") => panic!("syntax error"),
                         Some([tokens @ ..]) => inner.append(&mut Vec::from(tokens)),
                         None => panic!("syntax error"),
                     }
