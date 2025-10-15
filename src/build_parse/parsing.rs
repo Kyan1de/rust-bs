@@ -4,7 +4,7 @@ use std::iter::Peekable;
 impl BuildParser {
 
     /// takes a vector of token strings and constructs an AST
-    pub fn parse(input: Vec<BSToken>) -> BSAst {
+    pub fn parse(input: &Vec<BSToken>) -> BSAst {
         BSAst::Prog(Self::parse_lines(&mut input.split(|t|*t==BSToken::Break)))
     }
 
