@@ -7,7 +7,7 @@ impl BuildParser {
         let mut out = vec![];
 
         input.split("\n").for_each(|l|{
-            let split: Vec<&str> = Regex::new("(\\d+\\.\\d+)|(\\\".*?\\\")|(#.*)|[\\+\\-\\*\\/\\=\\(\\)\\[\\]\\,]|(\\b\\S+?\\b)").unwrap()
+            let split: Vec<&str> = Regex::new(r#"(\d+\.\d+)|(\".*?\")|(#.*)|[\+\-\*\/\=\(\)\[\]\,]|(\b\S+?\b)"#).unwrap()
                                    .find_iter(&l).map(|mat|{
                                        if mat.as_str().ends_with("\r") {&mat.as_str()[..(mat.len()-1)]} else {mat.as_str()}
                                    })

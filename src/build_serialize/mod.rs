@@ -19,7 +19,7 @@ impl BuildSerializer {
             let mut build = BuildSys::new();
 
             contents.iter().for_each(|l|{
-                let l: Vec<&str> = Regex::new("((\\\"|\\\').*?(\\\"|\\\'))|(\\b\\w+\\b)").unwrap()
+                let l: Vec<&str> = Regex::new(r#"((\"|\').*?(\"|\'))|(\b\w+\b)"#).unwrap()
                                     .find_iter(&l).map(|mat|{mat.as_str()})
                                     .collect();
                 if l.len() == 0 {return;}
